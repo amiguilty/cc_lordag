@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lykkehjulet</title>
+  <style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;background:#f5f0e8;color:#151515}
+body{overflow-x:hidden;min-height:100svh;padding-bottom:env(safe-area-inset-bottom)}
+.sound-toggle{position:fixed;top:18px;right:18px;width:48px;height:48px;border-radius:50%;background:#111;color:#fff;font-size:22px;display:grid;place-items:center;z-index:50;box-shadow:0 8px 22px #0003;transition:transform .15s,background .15s}
+.sound-toggle:hover{transform:scale(1.06)}
+.sound-toggle.muted{background:#ddd;color:#111}
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+.intro{text-align:center;width:min(900px,100%)}
+.intro h1{font-size:clamp(28px,5vw,64px);line-height:1.03;margin:0 0 48px;font-weight:800;letter-spacing:-.04em}
+.actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap}
+button{font:inherit;font-weight:800;border:0;cursor:pointer}
+.primary,.secondary{padding:16px 26px;border-radius:999px;font-size:18px}
+.primary{background:#111;color:#fff;box-shadow:0 8px 20px #0002;transition:transform .15s}
+.primary:hover{transform:translateY(-2px)}
+.secondary{background:#ddd;color:#888;cursor:not-allowed}
+.secondary:hover{
+  cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Ctext x='2' y='39' font-size='38'%3E%F0%9F%96%95%3C/text%3E%3C/svg%3E") 8 8, not-allowed;
+}
+
+.modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:18px;z-index:10}
+.modal[hidden]{display:none}
+.modal-card{position:relative;background:#f8f4ec;width:min(760px,96vw);max-height:96vh;overflow:auto;border-radius:28px;padding:28px 22px 30px;text-align:center;box-shadow:0 30px 100px #0008}
+.wheel-wrap{position:relative;width:min(620px,86vw);margin:0 auto}
+canvas{display:block;width:100%;height:auto}
+.pointer{position:absolute;z-index:3;top:-3px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-top:0;border-bottom:34px solid #e32b2b;filter:drop-shadow(0 3px 2px #0005)}
+.spin-modal{margin-top:20px;background:#111;color:#fff;padding:15px 32px;border-radius:999px;font-size:18px}
+.spin-modal:disabled{opacity:.45;cursor:default}
+.result{margin:24px auto 0;max-width:600px}
+.result h2{font-size:clamp(25px,4vw,42px);line-height:1.04;margin:0 0 14px}
+.result p{font-size:19px;margin:0 0 18px}
+.presentation{display:inline-block;color:#111;text-decoration:underline;font-weight:800;font-size:18px}
+.close{position:absolute;right:16px;top:12px;background:transparent;font-size:34px;line-height:1;z-index:5}
+
+.confetti{position:fixed;width:10px;height:18px;z-index:30;pointer-events:none;animation:fall 2.2s cubic-bezier(.15,.7,.25,1) forwards}
+@keyframes fall{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(var(--dx),var(--dy)) rotate(760deg);opacity:0}}
+@media (max-width: 700px){
+  .sound-toggle{top:12px;right:12px;width:42px;height:42px;font-size:19px}
+  .page{min-height:100svh;padding:24px 18px}
+  .intro{padding:0 4px}
+  .intro h1{font-size:clamp(30px,9vw,48px);line-height:.98;margin:0 0 34px;letter-spacing:-.045em}
+  .actions{width:100%;flex-direction:column;gap:10px}
+  .primary,.secondary{width:100%;padding:15px 20px;font-size:16px}
+  .modal{padding:10px}
+  .modal-card{width:100%;max-height:calc(100svh - 20px);padding:34px 12px 22px;border-radius:22px}
+  .wheel-wrap{width:min(88vw,520px)}
+  .pointer{border-left-width:14px;border-right-width:14px;border-bottom-width:27px}
+  .spin-modal{margin-top:12px;width:min(88%,300px);padding:14px 25px}
+  .result{margin-top:18px;padding:0 4px}
+  .result h2{font-size:clamp(24px,7.5vw,34px);line-height:1.02}
+  .result p{font-size:16px;line-height:1.3}
+  .presentation{font-size:16px;line-height:1.25}
+}
+
+@media (max-width: 380px){
+  .intro h1{font-size:29px}
+  .modal-card{padding-left:8px;padding-right:8px}
+  .wheel-wrap{width:91vw}
+  .result h2{font-size:23px}
+}
+
+  </style>
+</head>
+<body>
+  <button id="soundToggle" class="sound-toggle" type="button" aria-label="Отключить звук" aria-pressed="false">🔊</button>
+  <main class="page">
+    <section class="intro" aria-label="Lykkehjulet">
+      <h1>Lykkehjulet – hvad mon du får i dag?</h1>
+      <div class="actions">
+        <button id="spinBtn" class="primary">SPINNN!!</button>
+        <button class="secondary" disabled>I'm not interested</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="gameModal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Lykkehjulet">
+      <button id="closeBtn" class="close" aria-label="Luk" hidden>×</button>
+
+      <div class="wheel-wrap">
+        <div class="pointer" aria-hidden="true"></div>
+        <canvas id="wheel" width="620" height="620"></canvas>
+      </div>
+
+      <button id="modalSpinBtn" class="spin-modal">KØR!</button>
+      <div id="result" class="result" hidden>
+        <h2>Tillykke! Du har vundet en tur med mig til Copenhagen Contemporary.</h2>
+        <p>Send dette skærmbillede til Kirill.</p>
+        <a class="presentation" href="https://copenhagencontemporary.org/fire-ice/" id="presentationLink" target="_self">
+          præsentation af udstillingen 11.09–31.12
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <audio id="music1" src="music1.mp3" preload="auto" loop></audio>
+  <audio id="music2" src="music2.mp3" preload="auto"></audio>
+  <audio id="music3" src="music3.mp3" preload="auto"></audio>
+
+  <script>
+const spinBtn = document.getElementById("spinBtn");
+const modal = document.getElementById("gameModal");
+const modalSpinBtn = document.getElementById("modalSpinBtn");
+const result = document.getElementById("result");
+const wheelCanvas = document.getElementById("wheel");
+const ctx = wheelCanvas.getContext("2d");
+
+const music1 = document.getElementById("music1");
+const music2 = document.getElementById("music2");
+const music3 = document.getElementById("music3");
+const soundToggle = document.getElementById("soundToggle");
+let soundMuted = false;
+
+const allAudio = [music1, music2, music3];
+
+function updateSoundUI(){
+  soundToggle.textContent = soundMuted ? "🔇" : "🔊";
+  soundToggle.classList.toggle("muted", soundMuted);
+  soundToggle.setAttribute("aria-label", soundMuted ? "Включить звук" : "Отключить звук");
+  soundToggle.setAttribute("aria-pressed", String(soundMuted));
+}
+
+soundToggle.addEventListener("click", ()=>{
+  soundMuted = !soundMuted;
+  allAudio.forEach(a => a.muted = soundMuted);
+  updateSoundUI();
+});
+
+updateSoundUI();
+
+const segments = [
+  {emoji:"🍷", label:"vin"},
+  {emoji:"🧸", label:"legetøj"},
+  {emoji:"💍", label:"ægteskab"},
+  {emoji:"🔞", label:"18+"},
+  {emoji:"🖕", label:"ups"},
+  {emoji:"💸", label:"penge"},
+  {emoji:"🎟️", label:"billet"} // ALWAYS THE WINNING SEGMENT
+];
+
+let rotation = 0;
+let spinning = false;
+const ticketIndex = segments.length - 1;
+
+function drawWheel(rot=rotation){
+  const dpr = window.devicePixelRatio || 1;
+  const cssSize = 620;
+  wheelCanvas.width = cssSize*dpr;
+  wheelCanvas.height = cssSize*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+
+  const cx = cssSize/2, cy = cssSize/2, r = 286;
+  ctx.clearRect(0,0,cssSize,cssSize);
+
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(rot);
+
+  const step = Math.PI*2/segments.length;
+  segments.forEach((s,i)=>{
+    const a0 = i*step - Math.PI/2;
+    const a1 = a0 + step;
+
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,r,a0,a1);
+    ctx.closePath();
+    ctx.fillStyle = i % 2 ? "#f3c64b" : "#e85c55";
+    ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "#f8f4ec";
+    ctx.stroke();
+
+    const mid = (a0+a1)/2;
+    ctx.save();
+    ctx.rotate(mid);
+    ctx.translate(r*.67,0);
+    ctx.rotate(Math.PI/2);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = '42px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    ctx.fillText(s.emoji,0,0);
+    ctx.restore();
+  });
+
+  ctx.beginPath();
+  ctx.arc(0,0,44,0,Math.PI*2);
+  ctx.fillStyle="#111";
+  ctx.fill();
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(cx,cy,290,0,Math.PI*2);
+  ctx.lineWidth=8;
+  ctx.strokeStyle="#111";
+  ctx.stroke();
+}
+
+function startMusic1OnLoad(){
+  music1.muted = soundMuted;
+  music1.currentTime = 0;
+  const p = music1.play();
+  if (p) p.catch(() => {});
+}
+
+function openGame(){
+  modal.hidden = false;
+  result.hidden = true;
+  modalSpinBtn.hidden = false;
+  modalSpinBtn.disabled = false;
+  drawWheel();
+}
+
+function startMusic2(){
+  music1.pause();
+  music1.currentTime = 0;
+  music2.currentTime = 0;
+  music2.muted = soundMuted;
+  music2.play().catch(()=>{});
+}
+
+function finish(){
+  spinning = false;
+  modalSpinBtn.disabled = true;
+  result.hidden = false;
+  modalSpinBtn.hidden = true;
+  music2.pause();
+  music2.currentTime = 0;
+  music3.currentTime = 0;
+  music3.muted = soundMuted;
+  music3.play().catch(()=>{});
+  burstFromCorner("left");
+  burstFromCorner("right");
+}
+
+function spin(){
+  if(spinning) return;
+  spinning = true;
+  modalSpinBtn.disabled = true;
+  result.hidden = true;
+  startMusic2();
+
+  // Force the ticket segment to land exactly under the top pointer.
+  const step = Math.PI*2/segments.length;
+  const ticketCenter = ticketIndex*step + step/2;
+  const target = -ticketCenter;
+  const extraTurns = 7 + Math.floor(Math.random()*3);
+  const start = rotation;
+  const delta = (target - start) + extraTurns*Math.PI*2;
+
+  const duration = 5200;
+  const t0 = performance.now();
+
+  function animate(now){
+    const p = Math.min(1,(now-t0)/duration);
+    const eased = 1-Math.pow(1-p,4);
+    rotation = start + delta*eased;
+    drawWheel(rotation);
+    if(p<1) requestAnimationFrame(animate);
+    else finish();
+  }
+  requestAnimationFrame(animate);
+}
+
+function burstFromCorner(side){
+  const count = 55;
+  for(let i=0;i<count;i++){
+    const el = document.createElement("div");
+    el.className="confetti";
+    el.style.left = side==="left" ? `${Math.random()*12+1}vw` : `${Math.random()*12+87}vw`;
+    el.style.bottom = `${Math.random()*8+2}vh`;
+    el.style.background = `hsl(${Math.random()*360},85%,58%)`;
+    el.style.setProperty("--dx", side==="left" ? `${60+Math.random()*35}vw` : `-${60+Math.random()*35}vw`);
+    el.style.setProperty("--dy", `${-(20+Math.random()*65)}vh`);
+    el.style.animationDelay = `${Math.random()*.35}s`;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),2600);
+  }
+}
+
+spinBtn.addEventListener("click",()=>{
+  openGame();
+  if (music1.paused) {
+    music1.currentTime = 0;
+    music1.muted = soundMuted;
+    music1.play().catch(()=>{});
+  }
+});
+
+modalSpinBtn.addEventListener("click",spin);
+
+window.addEventListener("resize",()=>drawWheel());
+
+drawWheel();
+startMusic1OnLoad();
+
+  </script>
+</body>
+</html>
